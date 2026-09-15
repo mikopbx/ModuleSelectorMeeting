@@ -1,8 +1,9 @@
 {
-    "name": "mikopbx/moduletemplate",
-    "description": "ModuleSelectorMeeting",
+    "name": "mikopbx/module-selector-meeting",
+    "description": "Meeting/conference module for MikoPBX with scheduled auto-dial of participants",
     "require": {
-        "mikopbx/core": ">=2020.2.757"
+        "mikopbx/core": ">=2020.2.757",
+        "cesargb/php-log-rotation": "^2.5"
     },
     "autoload": {
         "psr-4": {
