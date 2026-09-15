@@ -3,7 +3,7 @@
   "moduleUniqueID": "ModuleSelectorMeeting",
   "support_email": "help@miko.ru",
   "version": "%ModuleVersion%",
-  "min_pbx_version": "2020.2.757",
+  "min_pbx_version": "2026.1.1",
   "release_settings": {
     "publish_release": true,
     "changelog_enabled": true,
