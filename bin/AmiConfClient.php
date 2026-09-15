@@ -27,6 +27,16 @@ class AmiConfClient extends WorkerBase
     protected array $confUsers = [];
 
     /**
+     * Метки времени «висящих» приглашений: [extension][number] => timestamp.
+     * Защищает от повторного набора участника, которому уже звонят,
+     * но он ещё не снял трубку (не вошёл в конференцию).
+     */
+    protected array $pendingInvites = [];
+
+    /** Таймаут дозвона, в секундах: в его пределах повторный Originate не делаем. */
+    protected const INVITE_TIMEOUT = 40;
+
+    /**
      * Старт работы листнера.
      *
      * @param $argv
@@ -109,8 +119,17 @@ class AmiConfClient extends WorkerBase
             $parameters['Context'] !== SelectorMeetingConf::CONTEXT_MEETING){
             return;
         }
-        $userNumber = $parameters['CallerIDNum'];
+        // Номер участника берём из имени канала: сегмент между "/" и первым "-".
+        // Устойчиво к транспортам: PJSIP/201-0, PJSIP/201-WS-0, PJSIP/201-TLS-0.
+        $userNumber  = '';
+        $channelName = $parameters['Channel'] ?? '';
+        if (strpos($channelName, '/') !== false) {
+            $peer       = explode('/', $channelName)[1];
+            $userNumber = explode('-', $peer)[0];
+        }
         $extension  = $parameters['Conference'];
+        // Участник вошёл/вышел — приглашение больше не «висит».
+        unset($this->pendingInvites[$extension][$userNumber]);
         if($parameters['Event']==="ConfbridgeLeave"){
             unset($this->confUsers[$extension][$userNumber]);
             return;
@@ -128,7 +147,7 @@ class AmiConfClient extends WorkerBase
             SelectorMeetingConf::CONTEXT_MEETING,
             1,
             'AGI',
-            "$script,alert,$parameters[CallerIDNum],$countUsers",
+            "$script,alert,$userNumber,$countUsers",
             '60',
             'ALERT',
             'alert=1',
@@ -156,15 +175,24 @@ class AmiConfClient extends WorkerBase
             ],
         ];
         $users  = Extensions::find($filter);
+        $now = time();
         foreach ($users as $extensionData){
-            if(isset($this->confUsers[$extension][$extensionData->number])){
-                $this->logger->writeInfo("User $extensionData->number already in meeting $extension", 'inviteUsers');
+            $number = $extensionData->number;
+            if(isset($this->confUsers[$extension][$number])){
+                $this->logger->writeInfo("User $number already in meeting $extension", 'inviteUsers');
+                continue;
+            }
+            $pendingAt = $this->pendingInvites[$extension][$number] ?? 0;
+            if($pendingAt !== 0 && ($now - $pendingAt) < self::INVITE_TIMEOUT){
+                $this->logger->writeInfo("User $number is already being called to $extension", 'inviteUsers');
                 continue;
             }
             try {
-                $this->logger->writeInfo("Start invite $extensionData->number to $extension", 'inviteUsers');
-                Util::amiOriginate($extensionData->number, '', $extension);
+                $this->logger->writeInfo("Start invite $number to $extension", 'inviteUsers');
+                $this->pendingInvites[$extension][$number] = $now;
+                Util::amiOriginate($number, '', $extension);
             }catch (\Exception $e){
+                unset($this->pendingInvites[$extension][$number]);
                 $this->logger->writeError($e->getMessage(), 'inviteUsers');
             }
         }
