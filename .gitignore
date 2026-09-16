@@ -1,0 +1,15 @@
+# Composer dependencies (restore via `composer install`)
+/vendor/
+
+# Runtime data (module database, generated media)
+/db/*
+!/db/folder4db
+
+# OS / editor junk
+.DS_Store
+__MACOSX/
+
+# Backups and packaged artifacts
+*.bak
+*.bak.*
+*.zip
