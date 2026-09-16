@@ -165,6 +165,7 @@ class ModuleSelectorMeetingController extends BaseController
                 case 'id':
                     break;
                 case 'enabledAutoCall':
+                case 'enabledAlert':
                 case 'every1':
                 case 'every2':
                 case 'every3':

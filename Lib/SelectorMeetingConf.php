@@ -10,6 +10,7 @@
 namespace Modules\ModuleSelectorMeeting\Lib;
 
 use MikoPBX\Common\Models\Extensions;
+use MikoPBX\Core\System\Configs\PbxConf;
 use MikoPBX\Core\System\Processes;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\Cron\WorkerSafeScriptsCore;
@@ -22,6 +23,16 @@ class SelectorMeetingConf extends ConfigClass
 {
 
     public const CONTEXT_MEETING = 'selector-meeting';
+
+    /**
+     * Собственный контекст исходящего дозвона участников конференции.
+     * Это копия ядрового [internal-originate] БЕЗ строки
+     * Gosub(interception_start,...): сохраняются резолв контактов
+     * (set-dial-contacts, множественная регистрация) и редирект реального
+     * PJSIP-канала в конференцию, но не создаётся служебная CDR-строка
+     * ORIGINATE_TRY_DIAL. Core при этом не правится.
+     */
+    public const CONTEXT_ORIGINATE = 'internal-originate-selector-conf';
 
     /**
      * Receive information about mikopbx main database changes
@@ -82,6 +93,29 @@ class SelectorMeetingConf extends ConfigClass
             "    same => n,ConfBridge(\${EXTEN})" . PHP_EOL .
             "    same => n,Hangup()" . PHP_EOL.
             "exten => s,1,Hangup()" . PHP_EOL;
+
+        // Контекст исходящего дозвона без ORIGINATE_TRY_DIAL: копия
+        // [internal-originate] без Gosub(interception_start,...).
+        // Обзвон участников идёт через него (см. AmiConfClient::inviteUsers).
+        $conf .= PHP_EOL . '['.self::CONTEXT_ORIGINATE.']' . PHP_EOL . <<<'CONF'
+exten => _[0-9*#+a-zA-Z]!,1,Set(pt1c_cid=${FILTER(\*\#\+1234567890,${pt1c_cid})})
+same => n,Set(MASTER_CHANNEL(ORIGINATE_DST_EXTEN)=${IF($["${pt1c_dst}x" == "x"]?${pt1c_cid}:${pt1c_dst})})
+same => n,Set(number=${FILTER(\*\#\+1234567890,${EXTEN})})
+same => n,ExecIf($["${EXTEN}" != "${number}"]?Goto(${CONTEXT},${number},$[${PRIORITY} + 1]))
+same => n,Set(__IS_ORGNT=${EMPTY})
+same => n,ExecIf($["${pt1c_cid}x" != "x"]?Set(CALLERID(num)=${pt1c_cid}))
+same => n,ExecIf($["${origCidName}x" != "x"]?Set(CALLERID(name)=${origCidName}))
+same => n,GosubIf($["${DIALPLAN_EXISTS(${CONTEXT}-custom,${EXTEN},1)}" == "1"]?${CONTEXT}-custom,${EXTEN},1)
+same => n,ExecIf($["${SRC_QUEUE}x" != "x"]?Goto(internal-originate-queue,${EXTEN},1))
+same => n,ExecIf($["${CUT(CHANNEL,\;,2)}" == "2"]?Set(__PT1C_SIP_HEADER=${SIPADDHEADER}))
+same => n,ExecIf($["${PJSIP_ENDPOINT(${EXTEN},auth)}x" == "x"]?Goto(internal-num-undefined,${EXTEN},1))
+same => n,Gosub(set-dial-contacts,${EXTEN},1)
+same => n,ExecIf($["${FIELDQTY(DST_CONTACT,&)}" != "1" && "${ALLOW_MULTY_ANSWER}" != "1"]?Set(__PT1C_SIP_HEADER=${EMPTY_VAR}))
+same => n,ExecIf($["${DST_CONTACT}x" != "x"]?Dial(${DST_CONTACT},${ringlength},TtekKHhb(originate-create-channel,${EXTEN},1)U(originate-answer-channel),s,1)))
+exten => _[hit],1,Hangup
+CONF;
+        $conf .= PHP_EOL;
+
         return $conf;
     }
 
@@ -181,5 +215,30 @@ class SelectorMeetingConf extends ConfigClass
                 }
             }
         }
+    }
+
+    /**
+     * Process after enable action in web interface.
+     * Перегенерируем диалплан, чтобы появился наш контекст
+     * [internal-originate-selector-conf] и номера конференций в [internal].
+     * @see https://docs.mikopbx.com/mikopbx-development/module-developement/module-class#onaftermoduleenable
+     *
+     * @return void
+     */
+    public function onAfterModuleEnable(): void
+    {
+        PbxConf::dialplanReload();
+    }
+
+    /**
+     * Process after disable action in web interface.
+     * Перегенерируем диалплан, чтобы убрать контексты модуля.
+     * @see https://docs.mikopbx.com/mikopbx-development/module-developement/module-class#onaftermoduledisable
+     *
+     * @return void
+     */
+    public function onAfterModuleDisable(): void
+    {
+        PbxConf::dialplanReload();
     }
 }

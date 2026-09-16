@@ -38,6 +38,14 @@ class MeetingRules extends ModulesModelsBase
     public $enabledAutoCall;
 
     /**
+     * Если 1 — озвучивать вход участников в конференцию (TTS-оповещение).
+     * По умолчанию выключено.
+     *
+     * @Column(type="integer", nullable=true)
+     */
+    public $enabledAlert;
+
+    /**
      * @Column(type="integer", nullable=true)
      */
     public $every1;

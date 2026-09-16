@@ -30,6 +30,7 @@ class MeetingRulesForm extends ModuleBaseForm
         $this->add(new Text('extension', ['value' => $entity->extension]));
 
         $this->addCheckBox('enabledAutoCall', intval($entity->enabledAutoCall) === 1);
+        $this->addCheckBox('enabledAlert', intval($entity->enabledAlert) === 1);
         for ($i = 1; $i <= 7; $i++) {
             $fieldName = "every$i";
             $this->addCheckBox($fieldName, intval($entity->$fieldName) === 1);

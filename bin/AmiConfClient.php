@@ -140,6 +140,12 @@ class AmiConfClient extends WorkerBase
         if($parameters['Admin'] === 'Yes'){
             $this->inviteUsers($extension);
         }
+        // Оповещение о присоединении участника (TTS) — только если включено
+        // тумблером правила enabledAlert (по умолчанию выключено).
+        $ruleData = MeetingRules::findFirst("extension='$extension'");
+        if(!$ruleData || intval($ruleData->enabledAlert) !== 1){
+            return;
+        }
         $this->logger->writeInfo('Start alert '.$extension.', '.$script, 'EVENT');
         $this->am->Originate(
             "Local/$extension@internal/n",
@@ -190,7 +196,23 @@ class AmiConfClient extends WorkerBase
             try {
                 $this->logger->writeInfo("Start invite $number to $extension", 'inviteUsers');
                 $this->pendingInvites[$extension][$number] = $now;
-                Util::amiOriginate($number, '', $extension);
+                // Дозвон через собственный контекст-клон [internal-originate]
+                // без interception_start: те же резолв контактов и редирект
+                // реального канала в конференцию, но без CDR-строки
+                // ORIGINATE_TRY_DIAL. Остальные параметры — как в Util::amiOriginate.
+                $this->am->Originate(
+                    "Local/{$number}@".SelectorMeetingConf::CONTEXT_ORIGINATE,
+                    $extension,
+                    'all_peers',
+                    1,
+                    null,
+                    null,
+                    null,
+                    null,
+                    "pt1c_cid={$extension},__peer_mobile=",
+                    null,
+                    true
+                );
             }catch (\Exception $e){
                 unset($this->pendingInvites[$extension][$number]);
                 $this->logger->writeError($e->getMessage(), 'inviteUsers');

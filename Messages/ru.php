@@ -15,6 +15,7 @@ return [
     'SubHeaderModuleSelectorMeeting'   => 'Автоматический сбор совещания',
     'module_selectorMeeting_AddNewRecord'  => 'Добавить',
     'module_selectorMeeting_enabledAutoCall'  => 'Автоматический вызов по расписанию',
+    'module_selectorMeeting_enabledAlert'  => 'Оповещать о присоединении участников',
     'module_selectorMeeting_every1'     => 'Понедельник',
     'module_selectorMeeting_every2'     => 'Вторник',
     'module_selectorMeeting_every3'     => 'Среда',

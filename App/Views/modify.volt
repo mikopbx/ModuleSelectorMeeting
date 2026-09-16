@@ -52,6 +52,13 @@
     </div>
 
     <div class="field disability">
+        <div class="ui checkbox">
+            <label>{{ t._('module_selectorMeeting_enabledAlert') }}</label>
+            {{ form.render('enabledAlert') }}
+        </div>
+    </div>
+
+    <div class="field disability">
         <label>{{ t._('module_selectorMeeting_at_time') }}</label>
         {{ form.render('at_time') }}
     </div>

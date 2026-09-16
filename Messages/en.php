@@ -13,4 +13,5 @@ return [
     'BreadcrumbModuleSelectorMeeting'=> 'Selector meeting',
     'SubHeaderModuleSelectorMeeting' => 'Selector meeting',
     'module_template_AddNewRecord'  => 'Add new',
+    'module_selectorMeeting_enabledAlert'  => 'Announce participants joining',
 ];
